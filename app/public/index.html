@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>app-docker-example</title>
+    <style>
+      :root { color-scheme: light dark; --line: #d8d8dc; --muted: #6b7280; }
+      body {
+        font-family: system-ui, -apple-system, "Noto Sans Thai", sans-serif;
+        max-width: 42rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.6;
+      }
+      h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+      .sub { color: var(--muted); margin-top: 0; font-size: 0.9rem; }
+      .card { border: 1px solid var(--line); border-radius: 10px; padding: 1rem; margin: 1rem 0; }
+      .status { font-family: ui-monospace, monospace; font-size: 0.85rem; white-space: pre-wrap; }
+      form { display: flex; gap: 0.5rem; margin: 0; }
+      input { flex: 1; padding: 0.55rem; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+      button { padding: 0.55rem 1rem; border: 0; border-radius: 8px; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
+      ul { padding-left: 1.1rem; }
+      time { color: var(--muted); font-size: 0.8rem; }
+    </style>
+  </head>
+  <body>
+    <h1>app-docker-example</h1>
+    <p class="sub">หน้านี้เป็นไฟล์ static ที่ nginx เสิร์ฟเอง ส่วน /api/* nginx ส่งต่อไปที่ Express</p>
+
+    <div class="card">
+      <strong>สถานะระบบ</strong>
+      <div class="status" id="status">กำลังตรวจสอบ…</div>
+    </div>
+
+    <div class="card">
+      <form id="form">
+        <input id="body" placeholder="พิมพ์ข้อความแล้วกดบันทึกลง PostgreSQL" autocomplete="off" />
+        <button type="submit">บันทึก</button>
+      </form>
+      <ul id="list"></ul>
+    </div>
+
+    <script>
+      const statusEl = document.getElementById('status');
+      const listEl = document.getElementById('list');
+
+      const loadStatus = async () => {
+        try {
+          const res = await fetch('/readyz');
+          const data = await res.json();
+          statusEl.textContent = JSON.stringify(data, null, 2);
+        } catch (err) {
+          statusEl.textContent = 'เรียก /readyz ไม่ได้: ' + err.message;
+        }
+      };
+
+      const loadMessages = async () => {
+        const res = await fetch('/api/messages');
+        const rows = await res.json();
+        listEl.innerHTML = rows
+          .map((r) => `<li>${r.body} <time>${new Date(r.created_at).toLocaleString('th-TH')}</time></li>`)
+          .join('');
+      };
+
+      document.getElementById('form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('body');
+        if (!input.value.trim()) return;
+        await fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ body: input.value }),
+        });
+        input.value = '';
+        loadMessages();
+      });
+
+      loadStatus();
+      loadMessages();
+    </script>
+  </body>
+</html>

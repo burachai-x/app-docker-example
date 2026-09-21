@@ -1,0 +1,46 @@
+# ============================================================================
+#  ไฟล์ฐาน — เก็บเฉพาะสิ่งที่ "เหมือนกันทุกที่"
+#  ห้ามรันไฟล์นี้เดี่ยว ๆ ต้องซ้อนกับไฟล์ของแต่ละ environment เสมอ:
+#     dev       : docker compose -f compose.yaml -f compose.dev.yaml up
+#     prod เครื่อง web : docker compose -f compose.yaml -f compose.prod.web.yaml up -d
+#     prod เครื่อง db  : docker compose -f compose.prod.db.yaml up -d      (ไม่ใช้ไฟล์ฐาน)
+# ============================================================================
+name: app-docker-example
+
+services:
+  app:
+    build:
+      context: ./app
+      target: prod          # dev override เป็น target: dev
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      # จุดเดียวที่ dev กับ prod ต่างกันจริง ๆ คือ DB_HOST
+      #   dev  = ชื่อ service "db" ใน network เดียวกัน
+      #   prod = IP/hostname ของเครื่องฐานข้อมูล
+      DB_HOST: ${DB_HOST:-db}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${POSTGRES_DB:-appdb}
+      DB_USER: ${POSTGRES_USER:-appuser}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+    restart: unless-stopped
+    networks: [web]
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      # ไฟล์ static เสิร์ฟจาก nginx โดยตรง ไม่ต้องวิ่งผ่าน Node
+      - ./app/public:/usr/share/nginx/html:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks: [web]
+
+networks:
+  web:
+    driver: bridge

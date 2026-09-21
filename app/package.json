@@ -1,0 +1,19 @@
+{
+  "name": "app-docker-example",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ตัวอย่าง Express app ที่คุยกับ PostgreSQL ผ่าน nginx",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "migrate": "node src/migrate.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}

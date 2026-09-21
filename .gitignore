@@ -1,0 +1,26 @@
+# ค่าเฉพาะเครื่อง — ห้ามขึ้น git เด็ดขาด เพราะมีรหัสผ่านฐานข้อมูล
+.env
+.env.*
+!env/*.env.example
+deploy/deploy.env
+
+# ใบรับรองและคีย์
+*.key
+*.pem
+db/certs/server.*
+
+# ไฟล์สำรองฐานข้อมูล
+db/backups/*
+!db/backups/.gitkeep
+
+# Node
+node_modules/
+npm-debug.log*
+.npm/
+
+# เครื่องมือ/ระบบปฏิบัติการ
+graft/
+.DS_Store
+*.swp
+.idea/
+.vscode/

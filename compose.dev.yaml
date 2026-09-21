@@ -1,0 +1,58 @@
+# ============================================================================
+#  เครื่องเดฟ — ครบทั้ง nginx + app + postgres ในเครื่องเดียว
+#     docker compose -f compose.yaml -f compose.dev.yaml up --build
+#  หรือสั้น ๆ: make dev
+#  ค่าทุกตัวมี default ให้แล้ว จึงรันได้ทันทีโดยไม่ต้องสร้าง .env
+# ============================================================================
+services:
+  app:
+    build:
+      target: dev           # image ที่มี devDependencies และใช้ node --watch
+    environment:
+      NODE_ENV: development
+      DB_SSLMODE: disable   # อยู่ใน network เดียวกัน ไม่ต้องเข้ารหัส
+    volumes:
+      # mount source เพื่อให้แก้โค้ดแล้วรีโหลดเองโดยไม่ต้อง build ใหม่
+      - ./app/src:/app/src:ro
+      - ./app/migrations:/app/migrations:ro
+    ports:
+      # เปิดตรงไว้เผื่อยิง API ทดสอบ/ต่อ debugger โดยไม่ผ่าน nginx
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  nginx:
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    volumes:
+      - ./nginx/conf.d/dev.conf:/etc/nginx/conf.d/default.conf:ro
+
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-appdb}
+      POSTGRES_USER: ${POSTGRES_USER:-appuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+    ports:
+      # ผูกกับ 127.0.0.1 เท่านั้น เครื่องอื่นในออฟฟิศจะต่อฐานข้อมูลเดฟไม่ได้
+      - "127.0.0.1:${DB_PORT_HOST:-5432}:5432"
+    volumes:
+      # postgres 18 ขึ้นไป ต้อง mount ที่ /var/lib/postgresql (ไม่ใช่ .../data)
+      # image จะสร้างโฟลเดอร์ย่อยตามเวอร์ชันให้เอง เพื่อให้ pg_upgrade ทำงานได้
+      # ถ้า mount ผิดที่ คอนเทนเนอร์จะไม่ยอมสตาร์ตและขึ้น error เรื่อง "unused mount/volume"
+      - pgdata:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # ต้องใส่ -h 127.0.0.1 ให้เช็คผ่าน TCP จริง
+      # ถ้าไม่ใส่ pg_isready จะเช็คแค่ unix socket แล้วตอบ healthy ตั้งแต่พอร์ตยังไม่เปิด
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U ${POSTGRES_USER:-appuser} -d ${POSTGRES_DB:-appdb}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    networks: [web]
+
+volumes:
+  pgdata:
